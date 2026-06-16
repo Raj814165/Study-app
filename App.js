@@ -1,20 +1,26 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { StatusBar, LogBox } from 'react-native';
+import { AuthProvider } from './src/context/AuthContext';
+import { CourseProvider } from './src/context/CourseContext';
+import { ChatProvider } from './src/context/ChatContext';
+import AppNavigator from './src/navigation/AppNavigator';
+
+// Suppress specific warnings in development
+LogBox.ignoreLogs([
+  'AsyncStorage has been extracted',
+  'Setting a timer',
+  'VirtualizedLists should never be nested',
+]);
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AuthProvider>
+      <CourseProvider>
+        <ChatProvider>
+          <StatusBar barStyle="light-content" backgroundColor="#0A0A0F" />
+          <AppNavigator />
+        </ChatProvider>
+      </CourseProvider>
+    </AuthProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
