@@ -116,7 +116,7 @@ const ProfileScreen = ({ navigation }) => {
     {
       title: 'Support',
       items: [
-        { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => navigation.navigate('ChatDetail') },
+        { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => navigation.navigate('Support') },
         { icon: 'information-circle-outline', label: 'About', onPress: () => navigation.navigate('About') },
       ],
     },

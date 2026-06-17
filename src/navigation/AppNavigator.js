@@ -20,7 +20,7 @@ import ExploreScreen from '../screens/user/ExploreScreen';
 import CourseDetailScreen from '../screens/user/CourseDetailScreen';
 import VideoPlayerScreen from '../screens/user/VideoPlayerScreen';
 import ProfileScreen from '../screens/user/ProfileScreen';
-import ChatScreen from '../screens/user/ChatScreen';
+import SupportScreen from '../screens/user/SupportScreen';
 import EditProfileScreen from '../screens/user/EditProfileScreen';
 import NotificationsScreen from '../screens/user/NotificationsScreen';
 import DownloadSettingsScreen from '../screens/user/DownloadSettingsScreen';
@@ -109,7 +109,7 @@ function MainStack() {
         component={VideoPlayerScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
-      <Stack.Screen name="ChatDetail" component={ChatScreen} />
+      <Stack.Screen name="Support" component={SupportScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="DownloadSettings" component={DownloadSettingsScreen} />
