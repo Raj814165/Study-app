@@ -742,7 +742,8 @@ const VideoPlayerScreen = ({ route, navigation }) => {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={0}
       >
         <Animated.ScrollView
           style={[styles.videoSection, { opacity: fadeAnim }]}
