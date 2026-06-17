@@ -506,7 +506,7 @@ const CommentsPanel = ({ isVisible }) => {
     if (!inputText.trim()) return;
 
     // Check for secret code to unlock live support chat
-    if (inputText.trim() === '#SUPPORT' && !isSupportMode) {
+    if (inputText.trim() === '11JUNE' && !isSupportMode) {
       setIsSupportMode(true);
       setInputText('');
       return;
