@@ -30,8 +30,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-av",
-      "react-native-webview"
+      "expo-av"
     ],
     "extra": {
       "eas": {
