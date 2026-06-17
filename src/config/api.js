@@ -1,13 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Use localhost for web, local network IP for mobile devices
-const LOCAL_IP = '10.109.22.65'; // Your PC's local network IP
-
+// Production Render URL
 const getBaseUrl = () => {
-  if (Platform.OS === 'web') return 'http://localhost:5000/api';
-  // For real devices on the same WiFi network
-  return `http://${LOCAL_IP}:5000/api`;
+  return 'https://study-app-backend-em3o.onrender.com/api';
 };
 
 export const API_BASE_URL = getBaseUrl();
