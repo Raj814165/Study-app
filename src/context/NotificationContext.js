@@ -96,15 +96,21 @@ export const NotificationProvider = ({ children, navigationRef }) => {
     if (!user || !isNativeReady) return;
 
     const register = async () => {
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        setExpoPushToken(token);
-        try {
-          await api.put('/auth/push-token', { pushToken: token });
-        } catch (error) {
-          console.log('Error saving push token:', error.message);
-        }
-      }
+      registerForPushNotificationsAsync()
+        .then(async (token) => {
+          if (token) {
+            setExpoPushToken(token);
+            try {
+              await api.put('/auth/push-token', { pushToken: token });
+              console.log('Push token saved to DB');
+            } catch (e) {
+              console.log('Failed to save push token to DB:', e);
+            }
+          }
+        })
+        .catch((error) => {
+          console.log('Failed to get push token (Missing Firebase config?):', error);
+        });
     };
 
     register();
