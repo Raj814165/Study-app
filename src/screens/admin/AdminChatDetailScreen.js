@@ -10,6 +10,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,14 +27,11 @@ const formatTime = (timestamp) => {
 };
 
 const MessageBubble = React.memo(({ message, isAdmin }) => {
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-
   return (
-    <Animated.View
+    <View
       style={[
         styles.bubbleContainer,
         isAdmin ? styles.bubbleRight : styles.bubbleLeft,
-        { opacity: fadeAnim },
       ]}
     >
       {!isAdmin && (
@@ -64,20 +62,21 @@ const MessageBubble = React.memo(({ message, isAdmin }) => {
           {isAdmin && '  ✓'}
         </Text>
       </View>
-    </Animated.View>
+    </View>
   );
 });
 
 const AdminChatDetailScreen = ({ navigation, route }) => {
   const { conversationId, userName } = route.params;
   const { user } = useAuth();
-  const { getMessages, sendMessage, markReadByAdmin } = useChat();
+  const { getMessages, sendMessage, markReadByAdmin, deleteConversation } = useChat();
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef(null);
   const isNearBottomRef = useRef(true);
   const isFirstRender = useRef(true);
 
   const messages = getMessages(conversationId);
+  const displayMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   // Stable message IDs string to detect actual new messages
   const messageIds = useMemo(() => messages.map((m) => m.id).join(','), [messages]);
@@ -90,15 +89,7 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
     markReadByAdmin(conversationId);
   }, [messageIds]);
 
-  const handleContentSizeChange = useCallback(() => {
-    if (messages.length === 0) return;
-    if (isFirstRender.current) {
-      flatListRef.current?.scrollToEnd({ animated: false });
-      isFirstRender.current = false;
-    } else if (isNearBottomRef.current) {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }
-  }, [messages.length]);
+  // Removed scrollToEnd logic because FlatList is now inverted (WhatsApp style)
 
   const handleSend = useCallback(() => {
     if (!inputText.trim()) return;
@@ -146,8 +137,32 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
           <Text style={styles.headerName} numberOfLines={1}>{userName || 'Student'}</Text>
           <Text style={styles.headerStatus}>Student • Online</Text>
         </View>
-        <TouchableOpacity style={styles.headerAction} activeOpacity={0.7}>
-          <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textMuted} />
+        <TouchableOpacity 
+          style={styles.headerAction} 
+          activeOpacity={0.7}
+          onPress={() => {
+            Alert.alert(
+              'Delete Chat',
+              `Are you sure you want to delete this chat with ${userName}?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Delete', 
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await deleteConversation(conversationId);
+                      navigation.goBack();
+                    } catch (err) {
+                      Alert.alert('Error', err.message || 'Failed to delete chat');
+                    }
+                  }
+                }
+              ]
+            );
+          }}
+        >
+          <Ionicons name="trash-outline" size={24} color={COLORS.error || '#ff4757'} />
         </TouchableOpacity>
       </View>
 
@@ -159,14 +174,15 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
         {/* Messages */}
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={displayMessages}
           renderItem={renderMessage}
           keyExtractor={keyExtractor}
           contentContainerStyle={[
             styles.messagesList,
-            messages.length === 0 && styles.messagesListEmpty,
+            displayMessages.length === 0 && styles.messagesListEmpty,
           ]}
           showsVerticalScrollIndicator={false}
+          inverted={displayMessages.length > 0}
           ListEmptyComponent={
             <View style={styles.emptyInline}>
               <Ionicons name="chatbubble-ellipses-outline" size={40} color={COLORS.textMuted} />
@@ -174,12 +190,6 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
             </View>
           }
           onScroll={handleScroll}
-          onLayout={() => {
-            if (isFirstRender.current && messages.length > 0) {
-              flatListRef.current?.scrollToEnd({ animated: false });
-            }
-          }}
-          onContentSizeChange={handleContentSizeChange}
           scrollEventThrottle={200}
           removeClippedSubviews={Platform.OS === 'android'}
           maxToRenderPerBatch={15}

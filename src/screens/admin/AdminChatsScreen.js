@@ -52,51 +52,55 @@ const ConversationCard = ({ conversation, index, onPress, onDelete }) => {
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }] },
       ]}
     >
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.8}
-        onPressIn={() => Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true }).start()}
-        onPressOut={() => Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start()}
-        onPress={() => onPress(conversation)}
-      >
-        {/* Avatar */}
-        <LinearGradient
-          colors={hasUnread ? COLORS.gradientPrimary : COLORS.gradientCard}
-          style={styles.avatar}
+      <View style={styles.card}>
+        <TouchableOpacity
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+          activeOpacity={0.8}
+          onPress={() => onPress(conversation)}
         >
-          <Text style={[styles.avatarText, !hasUnread && { color: COLORS.textMuted }]}>{firstLetter}</Text>
-        </LinearGradient>
+          {/* Avatar */}
+          <LinearGradient
+            colors={hasUnread ? COLORS.gradientPrimary : COLORS.gradientCard}
+            style={styles.avatar}
+          >
+            <Text style={[styles.avatarText, !hasUnread && { color: COLORS.textMuted }]}>{firstLetter}</Text>
+          </LinearGradient>
 
-        {/* Content */}
-        <View style={styles.cardContent}>
-          <View style={styles.cardTopRow}>
-            <Text style={styles.userName} numberOfLines={1}>{conversation.userName}</Text>
-            <Text style={styles.timeText}>
-              {conversation.lastMessageTime ? formatRelativeTime(conversation.lastMessageTime) : ''}
-            </Text>
+          {/* Content */}
+          <View style={styles.cardContent}>
+            <View style={styles.cardTopRow}>
+              <Text style={styles.userName} numberOfLines={1}>{conversation.userName}</Text>
+              <Text style={styles.timeText}>
+                {conversation.lastMessageTime ? formatRelativeTime(conversation.lastMessageTime) : ''}
+              </Text>
+            </View>
+            <View style={styles.cardBottomRow}>
+              <Text
+                style={[styles.lastMessage, hasUnread && styles.lastMessageUnread]}
+                numberOfLines={1}
+              >
+                {conversation.lastMessage || 'No messages yet'}
+              </Text>
+              {hasUnread && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadText}>{conversation.unreadByAdmin}</Text>
+                </View>
+              )}
+            </View>
           </View>
-          <View style={styles.cardBottomRow}>
-            <Text
-              style={[styles.lastMessage, hasUnread && styles.lastMessageUnread]}
-              numberOfLines={1}
-            >
-              {conversation.lastMessage || 'No messages yet'}
-            </Text>
-            {hasUnread && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadText}>{conversation.unreadByAdmin}</Text>
-              </View>
-            )}
-          </View>
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity 
-          onPress={() => onDelete && onDelete(conversation)} 
-          style={{ padding: SPACING.xs }}
+          onPress={() => {
+            console.log('Trash icon clicked for', conversation.userName);
+            if (onDelete) onDelete(conversation);
+          }} 
+          style={{ padding: SPACING.md, justifyContent: 'center' }}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
         >
-          <Ionicons name="trash-outline" size={20} color={COLORS.error || '#ff4757'} />
+          <Ionicons name="trash-outline" size={24} color={COLORS.error || '#ff4757'} />
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 };
@@ -127,7 +131,7 @@ const AdminChatsScreen = ({ navigation }) => {
             try {
               await deleteConversation(conv.id);
             } catch (err) {
-              Alert.alert('Error', 'Failed to delete chat');
+              Alert.alert('Error', err.message || 'Failed to delete chat');
             }
           }
         }
