@@ -176,9 +176,15 @@ const ChatScreen = ({ navigation }) => {
     }
   }, [messageIds]);
 
-  const displayMessages = useMemo(() => [...visibleMessages].reverse(), [visibleMessages]);
-
-  // Removed scrollToEnd logic because FlatList is now inverted (WhatsApp style)
+  const handleContentSizeChange = useCallback(() => {
+    if (visibleMessages.length === 0) return;
+    if (isFirstRender.current) {
+      flatListRef.current?.scrollToEnd({ animated: false });
+      isFirstRender.current = false;
+    } else if (isNearBottomRef.current) {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [visibleMessages.length]);
 
   const handleSend = useCallback(() => {
     if (!inputText.trim() || !conversationId) return;
@@ -251,21 +257,22 @@ const ChatScreen = ({ navigation }) => {
         <FlatList
           style={{ flex: 1 }}
           ref={flatListRef}
-          data={displayMessages}
+          data={visibleMessages}
           renderItem={renderMessage}
           keyExtractor={keyExtractor}
           contentContainerStyle={[
             styles.messagesList,
-            displayMessages.length === 0 && styles.messagesListEmpty,
+            visibleMessages.length === 0 && styles.messagesListEmpty,
           ]}
           showsVerticalScrollIndicator={false}
-          inverted
-          ListEmptyComponent={
-            <View style={{ transform: [{ scaleY: -1 }] }}>
-              {renderEmpty()}
-            </View>
-          }
+          ListEmptyComponent={renderEmpty}
           onScroll={handleScroll}
+          onLayout={() => {
+            if (isFirstRender.current && visibleMessages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          onContentSizeChange={handleContentSizeChange}
           scrollEventThrottle={200}
           removeClippedSubviews={Platform.OS === 'android'}
           maxToRenderPerBatch={15}

@@ -76,7 +76,6 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
   const isFirstRender = useRef(true);
 
   const messages = getMessages(conversationId);
-  const displayMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   // Stable message IDs string to detect actual new messages
   const messageIds = useMemo(() => messages.map((m) => m.id).join(','), [messages]);
@@ -89,7 +88,15 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
     markReadByAdmin(conversationId);
   }, [messageIds]);
 
-  // Removed scrollToEnd logic because FlatList is now inverted (WhatsApp style)
+  const handleContentSizeChange = useCallback(() => {
+    if (messages.length === 0) return;
+    if (isFirstRender.current) {
+      flatListRef.current?.scrollToEnd({ animated: false });
+      isFirstRender.current = false;
+    } else if (isNearBottomRef.current) {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [messages.length]);
 
   const handleSend = useCallback(() => {
     if (!inputText.trim()) return;
@@ -175,22 +182,27 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
         <FlatList
           style={{ flex: 1 }}
           ref={flatListRef}
-          data={displayMessages}
+          data={messages}
           renderItem={renderMessage}
           keyExtractor={keyExtractor}
           contentContainerStyle={[
             styles.messagesList,
-            displayMessages.length === 0 && styles.messagesListEmpty,
+            messages.length === 0 && styles.messagesListEmpty,
           ]}
           showsVerticalScrollIndicator={false}
-          inverted
           ListEmptyComponent={
-            <View style={[styles.emptyInline, { transform: [{ scaleY: -1 }] }]}>
+            <View style={styles.emptyInline}>
               <Ionicons name="chatbubble-ellipses-outline" size={40} color={COLORS.textMuted} />
               <Text style={styles.emptyInlineText}>No messages in this conversation yet</Text>
             </View>
           }
           onScroll={handleScroll}
+          onLayout={() => {
+            if (isFirstRender.current && messages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          onContentSizeChange={handleContentSizeChange}
           scrollEventThrottle={200}
           removeClippedSubviews={Platform.OS === 'android'}
           maxToRenderPerBatch={15}
