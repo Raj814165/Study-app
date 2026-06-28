@@ -129,7 +129,7 @@ const HomeScreen = ({ navigation }) => {
 
   const renderFeaturedCard = (course, index) => (
     <TouchableOpacity
-      key={course.id}
+      key={course.id || course._id || index}
       style={styles.featuredCard}
       onPress={() => handleCoursePress(course)}
       activeOpacity={0.85}
@@ -163,7 +163,7 @@ const HomeScreen = ({ navigation }) => {
 
   const renderContinueCard = (course, index) => (
     <TouchableOpacity
-      key={course.id}
+      key={course.id || course._id || index}
       style={styles.continueCard}
       onPress={() => handleCoursePress(course)}
       activeOpacity={0.85}
@@ -187,7 +187,7 @@ const HomeScreen = ({ navigation }) => {
 
   const renderPopularCard = (course, index) => (
     <TouchableOpacity
-      key={course.id}
+      key={course.id || course._id || index}
       style={styles.popularCard}
       onPress={() => handleCoursePress(course)}
       activeOpacity={0.85}

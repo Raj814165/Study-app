@@ -239,7 +239,7 @@ const AdminDashboard = ({ navigation }) => {
     const animValue = itemAnims[index] || new Animated.Value(1);
     return (
       <Animated.View
-        key={course.id || index}
+        key={course.id || course._id || index}
         style={[
           styles.recentCard,
           {

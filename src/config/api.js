@@ -53,7 +53,17 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
+    const textData = await response.text();
+    
+    let data = {};
+    if (textData && textData.trim().length > 0) {
+      try {
+        data = JSON.parse(textData);
+      } catch (e) {
+        console.log(`[API Error ${endpoint}]: Non-JSON response`, textData.substring(0, 150));
+        throw new Error(`Server returned invalid data (Status ${response.status}). Are you sure the backend is fully deployed?`);
+      }
+    }
 
     if (!response.ok) {
       throw new Error(data.error || `Request failed with status ${response.status}`);
