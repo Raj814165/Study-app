@@ -138,7 +138,7 @@ function LoadingScreen() {
   );
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ navigationRef }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -147,6 +147,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer
+      ref={navigationRef}
       theme={{
         dark: true,
         colors: {

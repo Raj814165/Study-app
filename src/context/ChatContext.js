@@ -179,12 +179,12 @@ export const ChatProvider = ({ children }) => {
     return conv?.unreadByUser || 0;
   }, [conversations, myConversation]);
 
-  // Poll for new messages every 3 seconds
+  // Poll for new messages every 5 seconds
   useEffect(() => {
     pollRef.current = setInterval(() => {
       fetchMyConversation();
       fetchConversations();
-    }, 3000);
+    }, 5000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);

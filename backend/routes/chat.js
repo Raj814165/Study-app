@@ -1,6 +1,8 @@
 const express = require('express');
 const Conversation = require('../models/Conversation');
+const User = require('../models/User');
 const { protect, adminOnly } = require('../middleware/auth');
+const { sendExpoPushNotifications } = require('./notifications');
 
 const router = express.Router();
 
@@ -99,6 +101,36 @@ router.post('/send', protect, async (req, res) => {
     await conversation.save();
 
     const savedMsg = conversation.messages[conversation.messages.length - 1];
+
+    // Send push notifications
+    try {
+      if (isAdmin) {
+        // Admin sent message → notify the user
+        const targetUser = await User.findById(conversation.userId).select('expoPushToken');
+        if (targetUser?.expoPushToken) {
+          sendExpoPushNotifications(
+            [targetUser.expoPushToken],
+            'New message from Support Team',
+            text.trim().substring(0, 100),
+            { type: 'chat', conversationId: conversation._id.toString() }
+          );
+        }
+      } else {
+        // User sent message → notify all admins
+        const admins = await User.find({ role: 'admin', expoPushToken: { $ne: null } }).select('expoPushToken');
+        const adminTokens = admins.map((a) => a.expoPushToken).filter(Boolean);
+        if (adminTokens.length > 0) {
+          sendExpoPushNotifications(
+            adminTokens,
+            `New message from ${req.user.name}`,
+            text.trim().substring(0, 100),
+            { type: 'chat', conversationId: conversation._id.toString(), userName: req.user.name }
+          );
+        }
+      }
+    } catch (pushError) {
+      console.log('Push notification error (non-fatal):', pushError.message);
+    }
 
     res.json({
       success: true,

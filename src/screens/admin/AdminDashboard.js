@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   StatusBar,
   Dimensions,
   Image,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +19,7 @@ import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } fro
 import { useCourses } from '../../context/CourseContext';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
+import { api } from '../../config/api';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - SPACING.xl * 2 - SPACING.md) / 2;
@@ -35,6 +39,12 @@ const AdminDashboard = ({ navigation }) => {
   const actionsAnim = useRef(new Animated.Value(0)).current;
   const recentAnim = useRef(new Animated.Value(0)).current;
   const itemAnims = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
+
+  // Broadcast announcement state
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastBody, setBroadcastBody] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
 
   useEffect(() => {
     const stagger = Animated.stagger(120, [
@@ -125,7 +135,44 @@ const AdminDashboard = ({ navigation }) => {
       gradient: COLORS.gradientAccent,
       badge: totalUnreadForAdmin,
     },
+    {
+      title: 'Send Announcement',
+      icon: 'megaphone',
+      screen: null,
+      gradient: COLORS.gradientSunset,
+      onPress: () => setShowBroadcastModal(true),
+    },
   ];
+
+  const handleBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) {
+      Alert.alert('Missing Info', 'Please enter both a title and message.');
+      return;
+    }
+
+    setBroadcastSending(true);
+    try {
+      const data = await api.post('/notifications/broadcast', {
+        title: broadcastTitle.trim(),
+        body: broadcastBody.trim(),
+      });
+
+      if (data.success) {
+        Alert.alert(
+          '✅ Sent!',
+          data.message || 'Notification sent to all users.',
+          [{ text: 'OK' }]
+        );
+        setBroadcastTitle('');
+        setBroadcastBody('');
+        setShowBroadcastModal(false);
+      }
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to send notification.');
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
 
   const renderStatCard = (stat, index) => {
     const animValue = statsAnim[index];
@@ -164,7 +211,7 @@ const AdminDashboard = ({ navigation }) => {
       key={action.title}
       style={styles.actionButton}
       activeOpacity={0.8}
-      onPress={() => navigation.navigate(action.screen)}
+      onPress={() => action.onPress ? action.onPress() : navigation.navigate(action.screen)}
     >
       <LinearGradient
         colors={action.gradient}
@@ -359,6 +406,112 @@ const AdminDashboard = ({ navigation }) => {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Broadcast Announcement Modal */}
+      <Modal
+        visible={showBroadcastModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBroadcastModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <LinearGradient
+                colors={COLORS.gradientSunset}
+                style={styles.modalIconWrap}
+              >
+                <Ionicons name="megaphone" size={22} color={COLORS.white} />
+              </LinearGradient>
+              <Text style={styles.modalTitle}>Send Announcement</Text>
+              <Text style={styles.modalSubtitle}>
+                This notification will be sent to all users
+              </Text>
+            </View>
+
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalLabel}>Title</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={broadcastTitle}
+                onChangeText={setBroadcastTitle}
+                placeholder="e.g. Class Started!"
+                placeholderTextColor={COLORS.textPlaceholder}
+                maxLength={100}
+              />
+            </View>
+
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalLabel}>Message</Text>
+              <TextInput
+                style={[styles.modalInput, styles.modalTextArea]}
+                value={broadcastBody}
+                onChangeText={setBroadcastBody}
+                placeholder="e.g. Join the live class now!"
+                placeholderTextColor={COLORS.textPlaceholder}
+                multiline
+                numberOfLines={3}
+                maxLength={500}
+              />
+            </View>
+
+            <View style={styles.modalQuickTags}>
+              <Text style={styles.modalLabel}>Quick Templates</Text>
+              <View style={styles.modalTagRow}>
+                {[
+                  { title: '🎓 Class Started!', body: 'Your live class has started. Join now!' },
+                  { title: '📚 New Batch!', body: 'A new batch is now available. Check it out!' },
+                  { title: '📢 Important Update', body: 'Please check the app for an important update.' },
+                ].map((tpl) => (
+                  <TouchableOpacity
+                    key={tpl.title}
+                    style={styles.modalTag}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setBroadcastTitle(tpl.title);
+                      setBroadcastBody(tpl.body);
+                    }}
+                  >
+                    <Text style={styles.modalTagText}>{tpl.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setShowBroadcastModal(false);
+                  setBroadcastTitle('');
+                  setBroadcastBody('');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSendBtn, broadcastSending && styles.modalSendBtnDisabled]}
+                onPress={handleBroadcast}
+                disabled={broadcastSending}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={COLORS.gradientSunset}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modalSendGradient}
+                >
+                  <Ionicons name={broadcastSending ? 'hourglass' : 'send'} size={16} color={COLORS.white} />
+                  <Text style={styles.modalSendText}>
+                    {broadcastSending ? 'Sending...' : 'Send to All'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -629,6 +782,132 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: SPACING.xxxl,
+  },
+  // Broadcast Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    ...SHADOWS.large,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: SPACING.xxl,
+  },
+  modalIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  modalSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+  modalInputGroup: {
+    marginBottom: SPACING.lg,
+  },
+  modalLabel: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modalInput: {
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md + 2,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  modalTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+    paddingTop: SPACING.md,
+  },
+  modalQuickTags: {
+    marginBottom: SPACING.xxl,
+  },
+  modalTagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  modalTag: {
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: BORDER_RADIUS.round,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  modalTagText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surfaceLight,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  modalCancelText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semibold,
+    color: COLORS.textSecondary,
+  },
+  modalSendBtn: {
+    flex: 1.5,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+  },
+  modalSendBtnDisabled: {
+    opacity: 0.6,
+  },
+  modalSendGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  modalSendText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.white,
   },
 });
 

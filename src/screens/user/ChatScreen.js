@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -30,29 +30,16 @@ const formatTime = (timestamp) => {
 
 const MESSAGE_LIFETIME_MS = 10000;
 
-const MessageBubble = ({ message, isOwn, index }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(isOwn ? 20 : -20)).current;
+const MessageBubble = React.memo(({ message, isOwn }) => {
   const timerAnim = useRef(new Animated.Value(1)).current;
   const fadeOutAnim = useRef(new Animated.Value(1)).current;
   const [secondsLeft, setSecondsLeft] = useState(null);
-  
+
   const msgTime = new Date(message.timestamp).getTime();
   const expiresAt = message.expiresAt || (msgTime + MESSAGE_LIFETIME_MS);
-  const willExpire = true;
-
-  // Entry animation
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, delay: index * 50, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 10, delay: index * 50, useNativeDriver: true }),
-    ]).start();
-  }, []);
 
   // Countdown timer bar + seconds display
   useEffect(() => {
-    if (!willExpire) return;
-
     const remaining = expiresAt - Date.now();
     if (remaining <= 0) return;
 
@@ -72,7 +59,6 @@ const MessageBubble = ({ message, isOwn, index }) => {
       if (left <= 0) {
         clearInterval(interval);
         setSecondsLeft(0);
-        // Fade out the bubble
         Animated.timing(fadeOutAnim, {
           toValue: 0,
           duration: 400,
@@ -81,17 +67,17 @@ const MessageBubble = ({ message, isOwn, index }) => {
       } else {
         setSecondsLeft(left);
       }
-    }, 500);
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [willExpire, expiresAt]);
+  }, [expiresAt]);
 
   return (
     <Animated.View
       style={[
         styles.bubbleContainer,
         isOwn ? styles.bubbleRight : styles.bubbleLeft,
-        { opacity: Animated.multiply(fadeAnim, fadeOutAnim), transform: [{ translateX: slideAnim }] },
+        { opacity: fadeOutAnim },
       ]}
     >
       {!isOwn && (
@@ -109,21 +95,19 @@ const MessageBubble = ({ message, isOwn, index }) => {
             style={[styles.bubble, styles.bubbleOwn]}
           >
             <Text style={styles.bubbleTextOwn}>{message.text}</Text>
-            {willExpire && (
-              <View style={styles.timerBarContainer}>
-                <Animated.View
-                  style={[
-                    styles.timerBar,
-                    {
-                      width: timerAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
-                />
-              </View>
-            )}
+            <View style={styles.timerBarContainer}>
+              <Animated.View
+                style={[
+                  styles.timerBar,
+                  {
+                    width: timerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
           </LinearGradient>
         ) : (
           <View style={[styles.bubble, styles.bubbleOther]}>
@@ -134,7 +118,7 @@ const MessageBubble = ({ message, isOwn, index }) => {
           <Text style={[styles.timestamp, isOwn && styles.timestampRight]}>
             {formatTime(message.timestamp)}
           </Text>
-          {willExpire && secondsLeft !== null && secondsLeft > 0 && (
+          {secondsLeft !== null && secondsLeft > 0 && (
             <Text style={styles.timerText}>
               🕐 {secondsLeft}s
             </Text>
@@ -143,7 +127,7 @@ const MessageBubble = ({ message, isOwn, index }) => {
       </View>
     </Animated.View>
   );
-};
+});
 
 const ChatScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -152,25 +136,28 @@ const ChatScreen = ({ navigation }) => {
   const [conversationId, setConversationId] = useState(null);
   const [, forceUpdate] = useState(0);
   const flatListRef = useRef(null);
+  const isNearBottomRef = useRef(true);
+  const isFirstRender = useRef(true);
 
   const conversation = getUserConversation(user?.uid);
   const allMessages = conversation?.messages || [];
 
-  const visibleMessages = allMessages.filter((msg) => {
-    const msgTime = new Date(msg.timestamp).getTime();
-    return Date.now() - msgTime < MESSAGE_LIFETIME_MS;
-  });
+  // Memoize visible messages based on message IDs to avoid unnecessary array recreation
+  const visibleMessages = useMemo(() => {
+    return allMessages.filter((msg) => {
+      const msgTime = new Date(msg.timestamp).getTime();
+      return Date.now() - msgTime < MESSAGE_LIFETIME_MS;
+    });
+  }, [allMessages, Math.floor(Date.now() / 2000)]); // only recompute every 2s
 
   // Re-render periodically to hide newly expired messages
   useEffect(() => {
     const interval = setInterval(() => {
       forceUpdate((n) => n + 1);
-    }, 500);
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, [allMessages]);
-
-
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -180,21 +167,26 @@ const ChatScreen = ({ navigation }) => {
     }
   }, [user]);
 
+  // Stable message IDs to track actual changes
+  const messageIds = useMemo(() => visibleMessages.map((m) => m.id).join(','), [visibleMessages]);
+
   useEffect(() => {
     if (conversationId) {
       markReadByUser(conversationId);
     }
-  }, [visibleMessages.length]);
+  }, [messageIds]);
 
-  useEffect(() => {
-    if (visibleMessages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 150);
+  const handleContentSizeChange = useCallback(() => {
+    if (visibleMessages.length === 0) return;
+    if (isFirstRender.current) {
+      flatListRef.current?.scrollToEnd({ animated: false });
+      isFirstRender.current = false;
+    } else if (isNearBottomRef.current) {
+      flatListRef.current?.scrollToEnd({ animated: true });
     }
   }, [visibleMessages.length]);
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     if (!inputText.trim() || !conversationId) return;
     sendMessage(conversationId, inputText, {
       uid: user.uid,
@@ -202,17 +194,24 @@ const ChatScreen = ({ navigation }) => {
       role: 'user',
     });
     setInputText('');
-  };
+  }, [inputText, conversationId, user, sendMessage]);
 
-  const renderMessage = ({ item, index }) => (
+  const renderMessage = useCallback(({ item }) => (
     <MessageBubble
       message={item}
       isOwn={item.senderId === user?.uid}
-      index={Math.min(index, 5)}
     />
-  );
+  ), [user?.uid]);
 
-  const renderEmpty = () => (
+  const keyExtractor = useCallback((item) => item.id, []);
+
+  const handleScroll = useCallback(({ nativeEvent }) => {
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    isNearBottomRef.current = distanceFromBottom < 100;
+  }, []);
+
+  const renderEmpty = useCallback(() => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconWrap}>
         <Ionicons name="chatbubbles-outline" size={56} color={COLORS.textMuted} />
@@ -222,7 +221,7 @@ const ChatScreen = ({ navigation }) => {
         Ask us anything about your courses, account, or learning journey. We're here to help!
       </Text>
     </View>
-  );
+  ), []);
 
   return (
     <View style={styles.container}>
@@ -259,14 +258,25 @@ const ChatScreen = ({ navigation }) => {
           ref={flatListRef}
           data={visibleMessages}
           renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
           contentContainerStyle={[
             styles.messagesList,
             visibleMessages.length === 0 && styles.messagesListEmpty,
           ]}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmpty}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onScroll={handleScroll}
+          onLayout={() => {
+            if (isFirstRender.current && visibleMessages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          onContentSizeChange={handleContentSizeChange}
+          scrollEventThrottle={200}
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={15}
+          windowSize={11}
+          initialNumToRender={20}
         />
 
         {/* Input Bar */}

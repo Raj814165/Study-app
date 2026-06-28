@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,23 +25,15 @@ const formatTime = (timestamp) => {
   return `${hours % 12 || 12}:${minutes} ${ampm}`;
 };
 
-const MessageBubble = ({ message, isAdmin, index }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(isAdmin ? 20 : -20)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, delay: Math.min(index, 5) * 50, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 10, delay: Math.min(index, 5) * 50, useNativeDriver: true }),
-    ]).start();
-  }, []);
+const MessageBubble = React.memo(({ message, isAdmin }) => {
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   return (
     <Animated.View
       style={[
         styles.bubbleContainer,
         isAdmin ? styles.bubbleRight : styles.bubbleLeft,
-        { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
+        { opacity: fadeAnim },
       ]}
     >
       {!isAdmin && (
@@ -74,7 +66,7 @@ const MessageBubble = ({ message, isAdmin, index }) => {
       </View>
     </Animated.View>
   );
-};
+});
 
 const AdminChatDetailScreen = ({ navigation, route }) => {
   const { conversationId, userName } = route.params;
@@ -82,8 +74,13 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
   const { getMessages, sendMessage, markReadByAdmin } = useChat();
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef(null);
+  const isNearBottomRef = useRef(true);
+  const isFirstRender = useRef(true);
 
   const messages = getMessages(conversationId);
+
+  // Stable message IDs string to detect actual new messages
+  const messageIds = useMemo(() => messages.map((m) => m.id).join(','), [messages]);
 
   useEffect(() => {
     markReadByAdmin(conversationId);
@@ -91,17 +88,19 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     markReadByAdmin(conversationId);
-  }, [messages.length]);
+  }, [messageIds]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 150);
+  const handleContentSizeChange = useCallback(() => {
+    if (messages.length === 0) return;
+    if (isFirstRender.current) {
+      flatListRef.current?.scrollToEnd({ animated: false });
+      isFirstRender.current = false;
+    } else if (isNearBottomRef.current) {
+      flatListRef.current?.scrollToEnd({ animated: true });
     }
   }, [messages.length]);
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     if (!inputText.trim()) return;
     sendMessage(conversationId, inputText, {
       uid: user.uid,
@@ -109,15 +108,22 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
       role: 'admin',
     });
     setInputText('');
-  };
+  }, [inputText, conversationId, user, sendMessage]);
 
-  const renderMessage = ({ item, index }) => (
+  const renderMessage = useCallback(({ item }) => (
     <MessageBubble
       message={item}
       isAdmin={item.senderRole === 'admin'}
-      index={index}
     />
-  );
+  ), []);
+
+  const keyExtractor = useCallback((item) => item.id, []);
+
+  const handleScroll = useCallback(({ nativeEvent }) => {
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    isNearBottomRef.current = distanceFromBottom < 100;
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -155,7 +161,7 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
           ref={flatListRef}
           data={messages}
           renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
           contentContainerStyle={[
             styles.messagesList,
             messages.length === 0 && styles.messagesListEmpty,
@@ -167,7 +173,18 @@ const AdminChatDetailScreen = ({ navigation, route }) => {
               <Text style={styles.emptyInlineText}>No messages in this conversation yet</Text>
             </View>
           }
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onScroll={handleScroll}
+          onLayout={() => {
+            if (isFirstRender.current && messages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          onContentSizeChange={handleContentSizeChange}
+          scrollEventThrottle={200}
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={15}
+          windowSize={11}
+          initialNumToRender={20}
         />
 
         {/* Quick Reply Suggestions */}

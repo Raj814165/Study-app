@@ -163,4 +163,23 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
+// PUT /api/auth/push-token — Save user's Expo push token
+router.put('/push-token', protect, async (req, res) => {
+  try {
+    const { pushToken } = req.body;
+
+    if (!pushToken) {
+      return res.status(400).json({ error: 'Push token is required' });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, {
+      expoPushToken: pushToken,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
