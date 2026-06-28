@@ -171,4 +171,17 @@ router.put('/read/:id', protect, async (req, res) => {
   }
 });
 
+// DELETE /api/chat/:id — Delete a conversation
+router.delete('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const conversation = await Conversation.findByIdAndDelete(req.params.id);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    res.json({ success: true, message: 'Conversation deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

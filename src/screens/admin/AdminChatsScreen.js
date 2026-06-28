@@ -8,6 +8,7 @@ import {
   Animated,
   StatusBar,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +27,7 @@ const formatRelativeTime = (timestamp) => {
   return `${days}d ago`;
 };
 
-const ConversationCard = ({ conversation, index, onPress }) => {
+const ConversationCard = ({ conversation, index, onPress, onDelete }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -89,14 +90,19 @@ const ConversationCard = ({ conversation, index, onPress }) => {
           </View>
         </View>
 
-        <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+        <TouchableOpacity 
+          onPress={() => onDelete && onDelete(conversation)} 
+          style={{ padding: SPACING.xs }}
+        >
+          <Ionicons name="trash-outline" size={20} color={COLORS.error || '#ff4757'} />
+        </TouchableOpacity>
       </TouchableOpacity>
     </Animated.View>
   );
 };
 
 const AdminChatsScreen = ({ navigation }) => {
-  const { conversations } = useChat();
+  const { conversations, deleteConversation } = useChat();
   const [refreshing, setRefreshing] = useState(false);
   const headerAnim = useRef(new Animated.Value(0)).current;
 
@@ -108,14 +114,35 @@ const AdminChatsScreen = ({ navigation }) => {
     navigation.navigate('AdminChatDetail', { conversationId: conv.id, userName: conv.userName });
   }, [navigation]);
 
+  const handleDelete = useCallback((conv) => {
+    Alert.alert(
+      'Delete Chat',
+      `Are you sure you want to delete the chat with ${conv.userName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteConversation(conv.id);
+            } catch (err) {
+              Alert.alert('Error', 'Failed to delete chat');
+            }
+          }
+        }
+      ]
+    );
+  }, [deleteConversation]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 500);
   }, []);
 
   const renderItem = useCallback(
-    ({ item, index }) => <ConversationCard conversation={item} index={index} onPress={handlePress} />,
-    [handlePress]
+    ({ item, index }) => <ConversationCard conversation={item} index={index} onPress={handlePress} onDelete={handleDelete} />,
+    [handlePress, handleDelete]
   );
 
   const renderEmpty = () => (

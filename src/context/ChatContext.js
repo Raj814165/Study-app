@@ -139,6 +139,19 @@ export const ChatProvider = ({ children }) => {
     }
   }, []);
 
+  // Delete conversation (admin)
+  const deleteConversation = useCallback(async (conversationId) => {
+    try {
+      const res = await api.delete(`/chat/${conversationId}`);
+      if (res.success) {
+        setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      }
+      return res;
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
   // Mark conversation as read by user
   const markReadByUser = useCallback(async (conversationId) => {
     if (conversationId === 'temp') return;
@@ -205,6 +218,7 @@ export const ChatProvider = ({ children }) => {
         getUserUnread,
         fetchConversations,
         fetchMyConversation,
+        deleteConversation,
       }}
     >
       {children}
